@@ -7,7 +7,7 @@
 #include<stdlib.h>
 
 int main() {
-	int N = 4, i, j, matrix_size;//从0开始编号到最终编号为N
+	int N = 5, i, j, matrix_size;//从0开始编号到最终编号为N
 	int ni = 0;
 	double *A, *F;
 	double h;
@@ -34,7 +34,7 @@ int main() {
 			*(A + (i + 1 + j * (N + 1)) + ni*matrix_size) = 1;
 			*(A + (i - 1 + j * (N + 1)) + ni*matrix_size) = 1;
 			*(F + ni) = h*i*h*j*h*h;
-			printf("%lf \n", *(F + ni));
+			//printf("%lf \n", *(F + ni));
 		}
 	}
 
@@ -144,13 +144,14 @@ int main() {
 		*(A + ni + ni*matrix_size) = 0;
 	}
 
-	for (i = 0; i < matrix_size; i++)
-		printf("%lf\n", *(F + i));
+	//for (i = 0; i < matrix_size; i++)
+	//	printf("%lf\n", *(F + i));
 
 
 	/************************去掉矩阵多余的零，得到最终只含有非边界点的方程的系数矩阵和右端项**************/
 	double *AA, *FF;
-	int var,*index;//当前矩阵的行数
+	int var;//当前矩阵的行数和列数
+	int *index;
 	var = matrix_size - 2 * (N - 1) - 2 * (N + 1);
 	AA = (double *)calloc(sizeof(double), matrix_size*var);
 	FF = (double *)calloc(sizeof(double), var);
@@ -234,22 +235,21 @@ int main() {
 	//去掉系数矩阵中零列
 	for (i = 0; i < var; i++) {
 		for (j= 0; j<var; j++) {
-			*(A + j + i*var) = *(AA + (*(index_fei+j)) + i*var);
+			*(A + j + i*var) = *(AA + (*(index_fei+j)) + i*matrix_size);
 		}
 	}
 	free(AA);
 
 	////输出系数矩阵
-	//for (i = 0; i < var; i++) {
-	//	for (j = 0; j < var; j++)
-	//		printf("%lf ", *(A + i*var + j));
-	//	printf("\n");
-	//}
+	for (i = 0; i < var; i++) {
+		for (j = 0; j < var; j++)
+			printf("%lf ", *(A + i*var + j));
+		printf("\n");
+	}
 
 
 
 	/***********************去掉右端项里面多余的零*****************************************/
-	//寻找第一个不为零的元的标号
 	for (i = 0; i < var; i++) {
 		*(FF + i) = *(F + *(index_fei + i));
 	}
@@ -258,7 +258,7 @@ int main() {
 	
 	
 
-	//经数据输入到文件
+	//将数据输入到文件
 	FILE *fp;
 	fp = fopen("matrix.txt", "w+");
 	if (fp == NULL)printf("the file open failed!!!");
@@ -276,9 +276,144 @@ int main() {
 	for (i = 0; i<var; i++) {
 		fprintf(fp, "%lf\n", *(FF + i));
 	}
+
+
+	/***************************************************************************************/
+	//实现多色排序
+	int L = 1;//记录颜色种数
+	int *c;//记录每个节点所分配的颜色号
+	int *I;//所有节点组成的集合
+	int *T;//已经标记过颜色的节点集合
+	int num_T = 0, adj_num = 0;//TODO
+	int *S;//记录尚未标记颜色的节点
+	int *t;//辅助数组
+	int flag = 0;//set S=I\T
+	int kk = 0;//select kk \in S
+	int *adj;//记录kk节点的临接点
+
+	c = (int *)calloc(sizeof(int), var + 1);
+	I = (int *)calloc(sizeof(int), var + 1);
+	T = (int *)calloc(sizeof(int), var + 1);
+	S = (int *)calloc(sizeof(int), var + 1);
+	t = (int *)calloc(sizeof(int), var + 1);
+	adj = (int *)calloc(sizeof(int), var + 1);
+	if (c == NULL || I == NULL || T == NULL || S == NULL || t == NULL) {
+		printf("failed!!!!");
+	}
+
+
+	//初始化
+	for (i = 0; i < var + 1; i++) {
+		*(c + i) = 0;
+		*(I + i) = i;
+		*(T + i) = 0;
+		*(S + i) = 0;
+		*(t + i) = 0;
+		*(adj + i) = 0;
+	}
+	*(c + 1) = L;
+	*(T + 1) = 1;
+
+	num_T = 1;
+
+
+
+	while (num_T != var) {
+		kk = 0;
+		for (i = 1; i < var + 1; i++) {
+			flag = 0;
+			for (j = 1; j < num_T + 1; j++) {//以0为结束点
+				if (*(I + i) == *(T + j)) {
+					flag = 1;
+					break;
+				}
+			}
+			if (flag != 1) {
+				kk = (*(I + i));
+				printf("kk=%d \n", kk);
+				break;
+			}
+		}
+
+		for (i = 1; i < var + 1; i++)*(adj + i) = 0;
+
+		for (i = 1, k = 1; i <var + 1; i++) {//寻找kk点的临接点
+			if (*(A + i - 1 + (kk - 1)*var) != 0) {
+				*(adj + k) = i;
+				adj_num = k - 1;
+				k++;
+			}
+		}
+
+		adj_num = adj_num + 1;
+		for (i = 1; i <adj_num + 1; i++) {
+			flag = 0;
+			for (j = 1; j < num_T + 1; j++) {
+				if (*(adj + i) == *(T + j)) {
+					flag = 1;
+					break;
+				}
+			}
+			if (flag == 1) {
+				*(t + *(c + *(adj + i))) = 1;
+			}
+		}
+
+		for (i = 0; i < var; i++) {
+			printf("%d ", *(adj + i));
+		}
+		printf("\n");
+		for (i = 0; i < var; i++) {
+			printf("%d ", *(T + i));
+		}
+		printf("\n");
+		for (i = 0; i < var; i++) {
+			printf("%d ", *(t + i));
+		}
+		printf("\n");
+
+
+		for (j = 1; j <= var; j++) {
+			if (*(t + j) == 0)break;
+		}
+
+		*(c + kk) = j;
+		if (j == L + 1)L++;
+
+		for (i = 1; i <adj_num + 1; i++) {
+			flag = 0;
+			for (j = 1; j < num_T + 1; j++) {
+				if (*(adj + i) == *(T + j)) {
+					*(t + *(c + *(adj + i))) = 0;
+					break;
+				}
+			}
+		}
+
+		*(T + num_T) = kk;
+		num_T++;
+	}
+	printf("L=%d\n", L);
+	for (i = 0; i < var; i++) {
+		printf("%d\n", *(c + i));
+	}
+	
+	free(I);
+	free(S);
+	free(adj);
+	free(t);
+	free(T);
+
+
+	//向量c存储了对应顶点的颜色编号，c第一个元素为无用元素
+	//L存储对应颜色种类
+
+
+	free(c);
 	fclose(fp);
 	free(A);
 	free(FF);
+
 	system("pause");
 	return 0;
 }
